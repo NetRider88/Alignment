@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Logistics Details{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h1>Edit Logistics Information</h1>
+        <form method="post" id="logistics-form">
+            {{ form.hidden_tag() }}  <!-- Include CSRF token -->
+
+            <div id="logistics-events-container">
+                {% for event_form in form.events %}
+                <div class="event-block border rounded p-3 mt-3">
+                    {{ event_form.hidden_tag() }} <!-- Include CSRF token for each event_form -->
+                    <div class="form-group">
+                        <label>{{ event_form.webinar_url.label }}</label>
+                        {{ event_form.webinar_url(class="form-control", readonly=True) }}
+                    </div>
+                    <div class="form-group">
+                        <label>{{ event_form.date_time.label }}</label>
+                        {{ event_form.date_time(class="form-control", readonly=True) }}
+                    </div>
+                    <div class="form-group">
+                        <label>{{ event_form.notes.label }}</label>
+                        {{ event_form.notes(class="form-control", rows=3, readonly=True) }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            
+
+        </form>
+    </div>
+{% endblock %}

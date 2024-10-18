@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h1>Centralized Dashboard</h1>
+        <table class="table table-bordered mt-4">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Vendor Data</td>
+                    <td>
+                        {% if filename %}
+                            <a href="{{ url_for('download_file', filename=filename) }}">Uploaded (Download Braze friendly segment)</a>
+                        {% else %}
+                            Pending
+                        {% endif %}
+                    </td>
+                    <td><a href="{{ url_for('upload') }}" class="btn btn-link">Go to Upload</a></td>
+                    <td>
+                        {% if filename %}
+                            <a href="{{ url_for('vendor_data') }}" class="btn btn-link">View Vendor Data</a>
+                        {% else %}
+                            <span>N/A</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                
+                
+                <tr>
+                    <td>Logistics</td>
+                    <td>{{ progress['Logistics'] }}</td>
+                    <td><a href="{{ url_for('logistics') }}" class="btn btn-link">Go to Logistics</a></td>
+                    <td>
+                        {% if progress['Logistics'] == 'Completed' %}
+                            <a href="{{ url_for('logistics_view') }}" class="btn btn-link">View/Edit Logistics</a>
+                        {% else %}
+                            <span>N/A</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Content</td>
+                    <td>{{ progress['Content'] }}</td>
+                    <td><a href="{{ url_for('content') }}" class="btn btn-link">Go to Content</a></td>
+                    <td>
+                        {% if progress['Content'] == 'Completed' %}
+                            <a href="{{ url_for('content_view') }}" class="btn btn-link">View/Edit Content</a>
+                        {% else %}
+                            <span>N/A</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Reporting</td>
+                    <td>{{ progress['Reporting'] }}</td>
+                    <td><a href="{{ url_for('reporting') }}" class="btn btn-link">Go to Reporting</a></td>
+                    <td>
+                        {% if progress['Reporting'] == 'Completed' %}
+                            <a href="{{ url_for('view_reporting') }}" class="btn btn-link">View Report</a>
+                        {% else %}
+                            <span>N/A</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

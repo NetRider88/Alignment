@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Report{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h1>Generate Report</h1>
+        <form method="post" id="reporting-form">
+            {{ form.hidden_tag() }}  <!-- Include CSRF token -->
+            <div class="row">
+                <div class="col-md-6">
+                    <h3>Email Reporting</h3>
+                    <div class="form-group">
+                        <label>{{ form.email_report.email_count.label }}</label>
+                        {{ form.email_report.email_count(class="form-control") }}
+                    </div>
+                    <div class="form-group">
+                        <label>{{ form.email_report.sent.label }}</label>
+                        {{ form.email_report.sent(class="form-control") }}
+                    </div>
+                    <div class="form-group">
+                        <label>{{ form.email_report.read.label }}</label>
+                        {{ form.email_report.read(class="form-control") }}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h3>WhatsApp Reporting</h3>
+                    <div class="form-group">
+                        <label>{{ form.whatsapp_report.dispatched.label }}</label>
+                        {{ form.whatsapp_report.dispatched(class="form-control") }}
+                    </div>
+                    <div class="form-group">
+                        <label>{{ form.whatsapp_report.sent.label }}</label>
+                        {{ form.whatsapp_report.sent(class="form-control") }}
+                    </div>
+                    <div class="form-group">
+                        <label>{{ form.whatsapp_report.read.label }}</label>
+                        {{ form.whatsapp_report.read(class="form-control") }}
+                    </div>
+                    <div class="form-group">
+                        <label>{{ form.whatsapp_report.clicked.label }}</label>
+                        {{ form.whatsapp_report.clicked(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-4">{{ form.submit.label }}</button>
+        </form>
+    </div>
+{% endblock %}

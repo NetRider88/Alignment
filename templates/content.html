@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Content Details{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h1>Content Details</h1>
+        <form method="POST" id="content-form" enctype="multipart/form-data"> <!-- Added enctype for file uploads -->
+            {{ form.hidden_tag() }}  <!-- Include CSRF token -->
+
+            <div class="form-group">
+                <label>{{ form.email_content.label }}</label>
+                {{ form.email_content(class="form-control mb-3") }}
+            </div>
+
+            <div class="form-group">
+                <label>{{ form.email_date_time.label }}</label>
+                {{ form.email_date_time(class="form-control mb-3") }}
+            </div>
+
+            {% if session.get('image_filename') %}
+            <div class="form-group mt-4">
+                <label>Uploaded Image:</label>
+                <img src="{{ url_for('download_file', filename=session['image_filename']) }}" class="img-fluid" alt="Uploaded Image">
+            </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="image">Upload Image</label>
+                {{ form.image(class="form-control") }}
+            </div>
+
+            <h3 class="mt-4">WhatsApp Messages</h3>
+            <div id="whatsapp-messages-container">
+                {% for message_form in form.whatsapp_messages %}
+                <div class="message-block border rounded p-3 mt-3">
+                    {{ message_form.hidden_tag() }} <!-- Include CSRF token for each message_form -->
+                    <div class="form-group">
+                        <label>{{ message_form.message_body.label }}</label>
+                        <div class="input-group">
+                            {{ message_form.message_body(class="form-control") }}
+                            <div class="input-group-append">
+                                <button type="button" class="btn btn-secondary copy-btn" onclick="copyToClipboard('{{ message_form.message_body.id }}')">Copy to Clipboard</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>{{ message_form.date_time.label }}</label>
+                        {{ message_form.date_time(class="form-control") }}
+                    </div>
+
+                    <h4 class="mt-3">Links</h4>
+                    <div class="links-container">
+                        {% for link_form in message_form.links %}
+                        <div class="link-block mt-2">
+                            {{ link_form.hidden_tag() }} <!-- Include CSRF token for each link_form -->
+                            <div class="form-group">
+                                <label>{{ link_form.link_text.label }}</label>
+                                <div class="input-group">
+                                    {{ link_form.link_text(class="form-control") }}
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-secondary copy-btn" onclick="copyToClipboard('{{ link_form.link_text.id }}')">Copy Link Text</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>{{ link_form.link_url.label }}</label>
+                                <div class="input-group">
+                                    {{ link_form.link_url(class="form-control") }}
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-secondary copy-btn" onclick="copyToClipboard('{{ link_form.link_url.id }}')">Copy Link URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-secondary mt-2 add-link" onclick="addLink(this)">Add Another Link</button>
+                </div>
+                {% endfor %}
+            </div>
+
+            <button type="button" class="btn btn-secondary mt-4" id="add-message" onclick="addMessage()">Add Another WhatsApp Message</button>
+            <button type="submit" class="btn btn-primary mt-4">{{ form.submit.label }}</button>
+        </form>
+    </div>
+
+    <script>
+        let messageIndex = "{{ form.whatsapp_messages|length }}";
+        messageIndex = parseInt(messageIndex);
+
+        function addMessage() {
+            let container = document.getElementById('whatsapp-messages-container');
+            let newMessage = document.createElement('div');
+            newMessage.className = 'message-block border rounded p-3 mt-3';
+            newMessage.innerHTML = `
+                <div class="form-group">
+                    <label>WhatsApp Message Body</label>
+                    <div class="input-group">
+                        <textarea class="form-control" name="whatsapp_messages-${messageIndex}-message_body" id="whatsapp_messages-${messageIndex}-message_body"></textarea>
+                        <div class="input-group-append">
+                            <button type="button" class="btn btn-secondary copy-btn" onclick="copyToClipboard('whatsapp_messages-${messageIndex}-message_body')">Copy to Clipboard</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Message Date and Time</label>
+                    <input type="datetime-local" class="form-control" name="whatsapp_messages-${messageIndex}-date_time" id="whatsapp_messages-${messageIndex}-date_time">
+                </div>
+                <h4 class="mt-3">Links</h4>
+                <div class="links-container"></div>
+                <button type="button" class="btn btn-secondary mt-2 add-link" onclick="addLink(this)">Add Another Link</button>
+            `;
+            container.appendChild(newMessage);
+            messageIndex++;
+        }
+
+        function addLink(button) {
+            let linksContainer = button.previousElementSibling;
+            let linkIndex = linksContainer.getElementsByClassName('link-block').length;
+            let newLink = document.createElement('div');
+            newLink.className = 'link-block mt-2';
+            newLink.innerHTML = `
+                <div class="form-group">
+                    <label>Link Text</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="whatsapp_messages-${messageIndex}-links-${linkIndex}-link_text">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Link URL</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="whatsapp_messages-${messageIndex}-links-${linkIndex}-link_url">
+                    </div>
+                </div>
+            `;
+            linksContainer.appendChild(newLink);
+        }
+
+        function copyToClipboard(elementId) {
+            var copyText = document.getElementById(elementId);
+            if (copyText) {
+                copyText.select();
+                document.execCommand("copy");
+                alert("Copied the text: " + copyText.value);
+            }
+        }
+    </script>
+{% endblock %}

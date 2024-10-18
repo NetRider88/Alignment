@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Data{% endblock %}
+
+{% block content %}
+    <h1>Vendor Data</h1>
+    <p>Number of Rows Uploaded: {{ row_count }}</p>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload Vendor Data{% endblock %}
+
+{% block content %}
+    <div class="container mt-5"> 
+        <h1>Upload Vendor Data</h1>
+        <form method="POST" enctype="multipart/form-data">
+            {{ form.csrf_token }}
+            <div class="form-group">
+                {{ form.csv_file.label }}
+                {{ form.csv_file(class="form-control-file") }}
+            </div>
+            <button type="submit" class="btn btn-primary">{{ form.submit.label }}</button>
+        </form>
+    </div>
+{% endblock %}

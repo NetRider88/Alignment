@@ -1,0 +1,306 @@
+import os
+import uuid
+from flask import Flask, render_template, request, redirect, session, url_for, send_from_directory, flash
+from flask_wtf import FlaskForm
+from wtforms import FileField, SubmitField, StringField, TextAreaField, DateTimeLocalField, FieldList, FormField
+from wtforms.validators import DataRequired
+import pandas as pd
+import re
+from flask_session import Session  # Added import
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'John@123'  # Replace with an actual secret key
+app.config['UPLOAD_FOLDER'] = 'uploads'  # Folder to store temporary files
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max file size
+
+# Configure server-side session storage
+app.config['SESSION_TYPE'] = 'filesystem'  # Store sessions on the server-side filesystem
+Session(app)  # Initialize the server-side session
+
+# Ensure the upload folder exists
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
+
+# Country code mapping
+country_codes = {
+    "Egypt": "EG",
+    "United Arab Emirates": "AE",
+    "Oman": "OM",
+    "Bahrain": "BH",
+    "Qatar": "QA",
+    "Iraq": "IQ",
+    "Jordan": "JO",
+    "Kuwait": "KW"
+}
+
+# Define the forms
+class VendorDataForm(FlaskForm):
+    csv_file = FileField('CSV File', validators=[DataRequired()])
+    submit = SubmitField('Upload')
+
+class LogisticsForm(FlaskForm):
+    webinar_url = StringField('Webinar URL', validators=[DataRequired()])
+    date_time = DateTimeLocalField('Webinar Date and Time', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
+    notes = TextAreaField('Notes')
+    submit = SubmitField('Save')
+
+class WhatsAppLinkForm(FlaskForm):
+    link_text = StringField('Link Text', validators=[DataRequired()])
+    link_url = StringField('Link URL', validators=[DataRequired()])
+
+class WhatsAppMessageForm(FlaskForm):
+    message_body = TextAreaField('WhatsApp Message Body', validators=[DataRequired()])
+    date_time = DateTimeLocalField('Message Date and Time', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
+    links = FieldList(FormField(WhatsAppLinkForm), min_entries=1)
+    add_link = SubmitField('Add Link')
+
+class ContentForm(FlaskForm):
+    email_content = TextAreaField('Email Content', validators=[DataRequired()])
+    email_date_time = DateTimeLocalField('Email Date and Time', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
+    whatsapp_messages = FieldList(FormField(WhatsAppMessageForm), min_entries=1)
+    add_message = SubmitField('Add WhatsApp Message')
+    submit = SubmitField('Save')
+
+# Function to read and process vendor data
+def read_vendor_data(file):
+    try:
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(file)
+        print("CSV file read successfully.")  # Debugging print
+        df.columns = df.columns.str.strip().str.lower()  # Normalize column names
+
+        # Rename 'mobile number' to 'owner_phone'
+        if 'mobile number' in df.columns:
+            df.rename(columns={'mobile number': 'owner_phone'}, inplace=True)
+        else:
+            flash("Missing required column: 'mobile number'")
+            return None
+
+        # Rename 'account email' to 'email'
+        if 'account email' in df.columns:
+            df.rename(columns={'account email': 'email'}, inplace=True)
+        else:
+            flash("Missing required column: 'account email'")
+            return None
+
+        # Create 'external_id' column using 'country code' and 'grid'
+        if 'account country' in df.columns and 'grid' in df.columns:
+            df['country code'] = df['account country'].map(country_codes)
+            df['external_id'] = df['country code'] + '_' + df['grid'].astype(str)
+            df.drop(columns=['country code'], inplace=True)
+        else:
+            flash("Missing required columns: 'account country' and/or 'grid'")
+            return None
+
+        # Keep only the necessary columns
+        df = df[['external_id', 'email', 'owner_phone']]
+
+        # Validate phone numbers
+        invalid_phone_numbers = df[~df['owner_phone'].apply(lambda x: bool(re.match(r'^\+?[1-9]\d{1,14}$', str(x))))]
+
+        if not invalid_phone_numbers.empty:
+            flash("The following rows have invalid phone numbers:")
+            for index, row in invalid_phone_numbers.iterrows():
+                flash(f"Row {index + 1}: {row['owner_phone']}")
+        
+        # Return the cleaned DataFrame
+        return df
+    except Exception as e:
+        print(f"Error while reading CSV: {e}")  # Debugging print
+        flash(f"Error processing data: {e}")
+        return None
+
+# Route for the upload form
+@app.route('/upload', methods=['GET', 'POST'])
+def upload():
+    form = VendorDataForm()
+    if request.method == 'POST':
+        print("POST request received")  # Debugging print
+        if form.validate_on_submit():
+            print("Form validated")  # Debugging print
+            file = form.csv_file.data
+            df = read_vendor_data(file)
+            if df is not None:
+                filename = str(uuid.uuid4()) + '.csv'
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                try:
+                    df.to_csv(filepath, index=False)
+                    print(f"File saved to {filepath}")  # Debugging print
+                    session['filename'] = filename
+                    session['vendor_data_row_count'] = len(df)
+                    flash(f"File uploaded successfully with {len(df)} rows.")
+                    return redirect(url_for('dashboard'))
+                except Exception as e:
+                    print(f"Error saving file: {e}")  # Debugging print
+                    flash(f"Error saving file: {e}")
+            else:
+                flash("Error processing data.")
+        else:
+            print("Form validation failed")  # Debugging print
+            flash("Form validation failed. Please upload a valid CSV file.")
+    return render_template('upload.html', form=form)
+
+# Route for the logistics form
+@app.route('/logistics', methods=['GET', 'POST'])
+def logistics():
+    form = LogisticsForm()
+    if form.validate_on_submit():
+        webinar_url = form.webinar_url.data
+        date_time = form.date_time.data
+        notes = form.notes.data
+        session['logistics_completed'] = True
+        session['webinar_url'] = webinar_url
+        session['date_time'] = date_time.strftime('%Y-%m-%d %H:%M')
+        session['notes'] = notes
+        flash("Logistics information saved successfully.")
+        return redirect(url_for('dashboard'))
+    if 'logistics_completed' in session:
+        form.webinar_url.data = session.get('webinar_url', '')
+        form.date_time.data = pd.to_datetime(session.get('date_time', ''), format='%Y-%m-%d %H:%M')
+        form.notes.data = session.get('notes', '')
+    return render_template('logistics.html', form=form)
+
+# Route for the content form
+@app.route('/content', methods=['GET', 'POST'])
+def content():
+    form = ContentForm()
+    if request.method == 'POST':
+        print("POST request received for content")  # Debugging print
+        if form.validate_on_submit():
+            print("Content form validated")  # Debugging print
+            email_content = form.email_content.data
+            whatsapp_messages = []
+            for message_form in form.whatsapp_messages:
+                message = {
+                    'message_body': message_form.message_body.data,
+                    'date_time': message_form.date_time.data.strftime('%Y-%m-%d %H:%M'),
+                    'links': [{'link_text': link_form.link_text.data, 'link_url': link_form.link_url.data} for link_form in message_form.links]
+                }
+                whatsapp_messages.append(message)
+            session['content_completed'] = True
+            session['email_content'] = email_content
+            session['email_date_time'] = form.email_date_time.data.strftime('%Y-%m-%d %H:%M')
+            session['whatsapp_messages'] = whatsapp_messages
+            flash("Content information saved successfully.")
+            return redirect(url_for('dashboard'))
+        else:
+            print("Content form validation failed")  # Debugging print
+            for field, errors in form.errors.items():
+                for error in errors:
+                    print(f"Error in {field}: {error}")  # Debugging print
+            flash("Form validation failed. Please check the fields and try again.")
+    
+    # Populate form if data already exists in session
+    if 'content_completed' in session:
+        form.email_content.data = session.get('email_content', '')
+        form.email_date_time.data = pd.to_datetime(session.get('email_date_time', ''), format='%Y-%m-%d %H:%M', errors='coerce')
+        whatsapp_messages = session.get('whatsapp_messages', [])
+        for idx, message in enumerate(whatsapp_messages):
+            if idx < len(form.whatsapp_messages):
+                form.whatsapp_messages[idx].message_body.data = message['message_body']
+                form.whatsapp_messages[idx].date_time.data = pd.to_datetime(message['date_time'], format='%Y-%m-%d %H:%M', errors='coerce')
+                for link_idx, link in enumerate(message['links']):
+                    if link_idx < len(form.whatsapp_messages[idx].links):
+                        form.whatsapp_messages[idx].links[link_idx].link_text.data = link['link_text']
+                        form.whatsapp_messages[idx].links[link_idx].link_url.data = link['link_url']
+
+    return render_template('content.html', form=form)
+
+# Route for the dashboard
+@app.route('/dashboard')
+def dashboard():
+    filename = session.get('filename', None)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename) if filename else None
+    print(f"Dashboard check - Filepath: {filepath}")  # Debugging print
+    file_exists = os.path.exists(filepath) if filepath else False
+
+    logistics_completed = session.get('logistics_completed', False)
+    content_completed = session.get('content_completed', False)
+
+    progress = {
+        'Vendor Data': 'Uploaded' if file_exists else 'Pending',
+        'Logistics': 'Completed' if logistics_completed else 'Pending',
+        'Content': 'Completed' if content_completed else 'Pending'
+    }
+
+    return render_template('dashboard.html', progress=progress, filename=filename if file_exists else None, row_count=session.get('vendor_data_row_count', 0))
+
+# Route to view vendor data details
+@app.route('/vendor_data')
+def vendor_data():
+    filename = session.get('filename', None)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename) if filename else None
+    if filepath and os.path.exists(filepath):
+        df = pd.read_csv(filepath)
+        row_count = len(df)
+        return render_template('vendor_data.html', row_count=row_count)
+    else:
+        flash("No vendor data available.")
+        return redirect(url_for('dashboard'))
+
+# Route to view and edit logistics details
+@app.route('/logistics_view', methods=['GET', 'POST'])
+def logistics_view():
+    form = LogisticsForm()
+    if form.validate_on_submit():
+        webinar_url = form.webinar_url.data
+        date_time = form.date_time.data
+        notes = form.notes.data
+        session['webinar_url'] = webinar_url
+        session['date_time'] = date_time.strftime('%Y-%m-%d %H:%M')
+        session['notes'] = notes
+        flash("Logistics information updated successfully.")
+        return redirect(url_for('dashboard'))
+    if 'logistics_completed' in session:
+        form.webinar_url.data = session.get('webinar_url', '')
+        form.date_time.data = pd.to_datetime(session.get('date_time', ''), format='%Y-%m-%d %H:%M')
+        form.notes.data = session.get('notes', '')
+    return render_template('logistics_view.html', form=form)
+
+# Route to view and edit content details
+@app.route('/content_view', methods=['GET', 'POST'])
+def content_view():
+    form = ContentForm()
+    if form.validate_on_submit():
+        email_content = form.email_content.data
+        whatsapp_messages = []
+        for message_form in form.whatsapp_messages:
+            message = {
+                'message_body': message_form.message_body.data,
+                'date_time': message_form.date_time.data.strftime('%Y-%m-%d %H:%M'),
+                'links': [{'link_text': link_form.link_text.data, 'link_url': link_form.link_url.data} for link_form in message_form.links]
+            }
+            whatsapp_messages.append(message)
+        session['email_content'] = email_content
+        session['email_date_time'] = form.email_date_time.data.strftime('%Y-%m-%d %H:%M')
+        session['whatsapp_messages'] = whatsapp_messages
+        flash("Content information updated successfully.")
+        return redirect(url_for('dashboard'))
+    if 'content_completed' in session:
+        form.email_content.data = session.get('email_content', '')
+        form.email_date_time.data = pd.to_datetime(session.get('email_date_time', ''), format='%Y-%m-%d %H:%M', errors='coerce')
+        whatsapp_messages = session.get('whatsapp_messages', [])
+        for idx, message in enumerate(whatsapp_messages):
+            if idx < len(form.whatsapp_messages):
+                form.whatsapp_messages[idx].message_body.data = message['message_body']
+                form.whatsapp_messages[idx].date_time.data = pd.to_datetime(message['date_time'], format='%Y-%m-%d %H:%M', errors='coerce')
+                for link_idx, link in enumerate(message['links']):
+                    if link_idx < len(form.whatsapp_messages[idx].links):
+                        form.whatsapp_messages[idx].links[link_idx].link_text.data = link['link_text']
+                        form.whatsapp_messages[idx].links[link_idx].link_url.data = link['link_url']
+    return render_template('content_view.html', form=form)
+
+# Route to display the upload success message
+@app.route('/upload_success')
+def upload_success():
+    filename = request.args.get('filename', None)
+    if filename is None:
+        return "No file uploaded"
+    return render_template('upload_success.html', filename=filename)
+
+@app.route('/uploads/<filename>')
+def download_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+
+if __name__ == '__main__':
+    app.run(debug=True)

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload Successful{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h1>Upload Successful!</h1>
+        <p>Your file has been processed and saved. You can download it later using the link below:</p>
+        <a href="{{ url_for('download_file', filename=filename) }}">Download Processed Data</a>
+    </div>
+{% endblock %}

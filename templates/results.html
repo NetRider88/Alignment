@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+
+{% block title %}Processed Data{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h1>Processed Data</h1>
+        {{ data | safe }}  
+    </div>
+{% endblock %}
